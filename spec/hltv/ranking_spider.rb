@@ -1,7 +1,9 @@
 # frozen_string_literal: true
+# rubocop: disable all
 
 require 'rspec'
 require './app/hltv_spider'
+
 
 RSpec.describe HLTV::RankingSpider do
   describe '#parse' do
@@ -90,6 +92,27 @@ RSpec.describe HLTV::RankingSpider do
         # Caso o arquivo exista, vamos deletá-lo, pois criamos ele durante o teste
         File.delete(filepath)
         expect(File.exist?(filepath)).to eq(false)
+      end
+    end
+
+    context 'when processing a teamDiv' do
+      it 'returns an error when an div with wrong class was passed' do
+        spider = HLTV::RankingSpider.new
+        my_div = '<div class="customClass"></div>'
+        expect {spider.proccess(my_div)}.to raise_error(RuntimeError)
+      end
+      it 'sets to nil when the given field is blank' do
+        my_div = "<div class='ranking-header'><span class='position'></span></div>"
+        spider = HLTV::RankingSpider.new
+        result = spider.proccess(my_div)
+        expected = {
+          :points => nil,
+          :name => nil,
+          :players => [],
+          :position => nil,
+        }
+
+        expect(result).to eq(expected)
       end
     end
   end

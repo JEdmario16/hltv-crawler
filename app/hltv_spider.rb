@@ -7,7 +7,6 @@
 require 'nokogiri'
 require 'httparty'
 require 'json'
-
 # Este módulo implemente classes de Spiders para extrair dados do site HLTV
 # https://www.hltv.org/
 # O módulo HLTV é um módulo de nível superior que contém todas as classes de Spiders
@@ -33,10 +32,20 @@ module HLTV
     def parse(url = nil)
       url ||= "#{BASE_URL}/ranking/teams"
       resp = get_url(url)
+      doc = Nokogiri::HTML5(resp.body)
 
-      # Caso contrário, inicializa um objeto Nokogiri com o HTML da resposta
-      doc = Nokogiri::HTML(resp.body)
+      # Inicializa um array vazio para armazenar os times
+      teams = []
+      doc.css('div.ranking-header').each do |team|
+        team_data = proccess team
+        teams << team_data
+      end
 
+      teams
+    end
+
+    def proccess(team)
+      #
       # A estrutura de dados que vamos extrair é composta por times no ranking, que estão contidos
       # dentro de elementos <div> com a classe CSS 'ranking-header'.
       # Cada elemento 'ranking-header' contém informações importantes: o posicionamento do time
@@ -46,30 +55,27 @@ module HLTV
       # - jogadores do time armazenados em elementos <div> com a classe CSS 'playerLine'.
       #   Geralmente, cada div 'playerLine' possui 5 subelementos, incluindo div.rankingNicknames > span,
       #   que contém o nome do jogador.
-      # Agora prosseguimos com a extração e manipulação dos dados conforme a estrutura mencionada.
+      # Para este método, vamos considerar que a div passada será 'div.ranking-header'
+      #
 
-      # Inicializa um array vazio para armazenar os times
-      teams = []
-      doc.css('div.ranking-header').each do |team|
-        team_data = {}
+      team = team.instance_of?(Nokogiri::HTML5) ? team : Nokogiri::HTML5(team)
+      raise('Team div must be an "ranking-header" class') if team.css('div.ranking-header').empty?
 
-        # captura a posição do time
-        team_data[:position] = team.css('span.position').text
+      team_data = {}
 
-        relative_selec = team.css('div.relative')
+      # captura a posição do time
+      team_data[:position] = team.css('span.position').text
 
-        team_data[:name] = relative_selec.css('div.teamLine > span.name').text
-        team_data[:points] = relative_selec.css('div.teamLine span.points').text
+      relative_selec = team.css('div.relative')
 
-        team_data[:players] = relative_selec.css('div.playersLine > div.rankingNicknames').map do |p|
-          p.css('span').text
-        end
+      team_data[:name] = relative_selec.css('div.teamLine > span.name').text or nil
+      team_data[:points] = relative_selec.css('div.teamLine span.points').text or nil
 
-        clear_data! team_data
-        teams << team_data
+      team_data[:players] = relative_selec.css('div.playersLine > div.rankingNicknames').map do |p|
+        p.css('span').text or nil
       end
-
-      teams
+      clear_data! team_data
+      team_data
     end
 
     def generate_json(filepath, url)
@@ -90,11 +96,13 @@ module HLTV
     end
 
     def clear_data!(team_data)
-      # Veja que points é da forma `(999 points)`. Vamos limpar isso e pegar apenas número
-      team_data[:points] = team_data[:points].match(/[0-9]+/)[0].to_i
+      matched = team_data[:points].match(/[0-9]+/)
+      team_data[:points] = !matched.nil? ? matched[0].to_i : nil
 
-      # Ainda, a posição também é da forma #999. Vamos limpar isso
-      team_data[:position] = team_data[:position].match(/[0-9]+/)[0].to_i
+      matched = team_data[:position].match(/[0-9]+/)
+      team_data[:position] = !matched.nil? ? matched[0].to_i : nil
+
+      team_data.each { |k, v| team_data[k] = nil if v == '' }
     end
   end
 
