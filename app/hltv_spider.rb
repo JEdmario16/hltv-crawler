@@ -7,6 +7,9 @@
 require 'nokogiri'
 require 'httparty'
 require 'json'
+require 'date'
+
+require 'byebug'
 # Este módulo implemente classes de Spiders para extrair dados do site HLTV
 # https://www.hltv.org/
 # O módulo HLTV é um módulo de nível superior que contém todas as classes de Spiders
@@ -29,8 +32,24 @@ module HLTV
   # e irá armazenar os dados em um arquivo JSON
   #
   class RankingSpider
-    def parse(url = nil)
-      url ||= "#{BASE_URL}/ranking/teams"
+    ALLOWED_REGIONS = [
+      'North America', 'Argentina', 'Brazil', 'Belarus',
+      'Czech Republic', 'Denmark', 'Finland', 'France', 'Germany',
+      'Hungary', 'Kazakhstan', 'Poland', 'Portugal', 'Russia',
+      'Sweden', 'Ukraine', 'United Kingdom', 'Asia', 'Mongolia',
+      'Australia', 'Noth America', 'South America', 'Europe', 'Oceania'
+    ].freeze
+
+    def parse(url = nil, **kwargs)
+
+      if url.nil?
+        url = if kwargs.empty?
+                "#{BASE_URL}/ranking/teams/"
+              else
+                generate_url(date: kwargs[:date], region: kwargs[:region])
+              end
+      end
+      # Caso seja passada uma url
       resp = get_url(url)
       doc = Nokogiri::HTML5(resp.body)
 
@@ -90,9 +109,29 @@ module HLTV
 
     def get_url(url)
       resp = HTTParty.get(url, headers: HEADER)
+
       raise ConnectionError, "Connection error: #{resp.code}" if resp.code != 200
 
       resp
+    end
+
+    def generate_url(**kwargs)
+      raise('invalid Region') unless !kwargs[:region].nil? && !(kwargs[:region] in ALLOWED_REGIONS)
+
+      # Esperamos que date seja da forma yyyy-mm-dd
+      # Caso a data passado for uma string, converte para um Date object
+      date = Date.strptime(kwargs[:date], '%Y-%m-%d') if kwargs[:date].instance_of?(String)
+
+      # Pega a Segunda-feria anterior mais próxima
+      date -= 1 until date.monday?
+
+      # Converte a data para obter o nome do mês
+      date = date.strftime('%Y-%B-%d')
+      year, month, day = date.split('-')
+
+      # Por fim, geramos uma nova url
+      # É sempre muito estranho esses retornos implícitos btw
+      "#{BASE_URL}/ranking/teams/#{year}/#{month.downcase}/#{day}"
     end
 
     def clear_data!(team_data)

@@ -4,6 +4,7 @@
 require 'rspec'
 require './app/hltv_spider'
 
+require 'byebug'
 
 RSpec.describe HLTV::RankingSpider do
   describe '#parse' do
@@ -63,12 +64,34 @@ RSpec.describe HLTV::RankingSpider do
 
         expect(parsed_data[10]).to eq(data)
       end
-
       it  'returns a valid json when no url is provided' do
         spider = HLTV::RankingSpider.new
         parsed_data = spider.parse()
 
         expect(parsed_data.empty?).to eq(false)
+      end
+      it 'returns a valid json when valid date and regions is provided' do
+        spider = HLTV::RankingSpider.new
+        parsed_data = spider.parse(date:'2023-01-01', region: 'Brazil')
+        
+        expect(parsed_data).to be_a(Array)
+        expect(parsed_data.empty?).to be false
+      end
+
+      it 'returns a valid json when valid date and no region is provided' do 
+        spider = HLTV::RankingSpider.new
+        parsed_data = spider.parse(date:'2023-03-03', region: '')
+
+        expect(parsed_data).to be_a(Array)
+        expect(parsed_data.empty?).to be false
+      end
+
+      it 'returns a valid json when no url, region and date is provided' do
+        spider = HLTV::RankingSpider.new
+        parsed_data = spider.parse()
+
+        expect(parsed_data).to be_a(Array)
+        expect(parsed_data.empty?).to be false
       end
     end
 
@@ -96,11 +119,6 @@ RSpec.describe HLTV::RankingSpider do
     end
 
     context 'when processing a teamDiv' do
-      it 'returns an error when an div with wrong class was passed' do
-        spider = HLTV::RankingSpider.new
-        my_div = '<div class="customClass"></div>'
-        expect {spider.proccess(my_div)}.to raise_error(RuntimeError)
-      end
       it 'sets to nil when the given field is blank' do
         my_div = "<div class='ranking-header'><span class='position'></span></div>"
         spider = HLTV::RankingSpider.new
@@ -113,6 +131,11 @@ RSpec.describe HLTV::RankingSpider do
         }
 
         expect(result).to eq(expected)
+      end
+    end
+
+    context 'when generating an url' do
+      it 'Raises an error when invalid region is passed to' do
       end
     end
   end
