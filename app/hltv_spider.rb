@@ -25,13 +25,73 @@ module HLTV
   # rubocop:enable Style/MutableConstant
   BASE_URL = 'https://www.hltv.org'
 
+  # Classe de base para as outras spiders
+  # Define métodos genéricos úteis em cada um dos spiders
+  class SpiderBase
+    def get_url(url)
+      resp = HTTParty.get(url, headers: HEADER)
+      raise ConnectionError, "Connection error: #{resp.code}" if resp.code != 200
+
+      resp
+    end
+
+    def generate_json(filepath, url = nil, **kwargs)
+      # Esperamos que um método `parse` seja definido para
+      # a classe que herdar esta aqui
+      data = parse(url, **kwargs)
+
+      File.open(filepath, 'w') do |file|
+        file.write(data.to_json)
+      end
+    end
+
+    # Este método irá usar o search da hltv e fazer uma busca pela
+    # query_string passada
+    def search(query)
+      url = "#{BASE_URL}/search?query=#{query}"
+      resp = get_url(url)
+      doc = Nokogiri::HTML5(resp)
+      # A rota de busca retorna resultados separados por categorias.
+      # As categorias são: Player, Team, Event e Article
+      # Os resultados de categorias estão armazenados na seguinte estrutura:
+      # tr > td.table-header armazena o nome da categoria
+      # as td's irmãs do header armazena os resultados. Elas tem uma classe=''
+
+      # Este seletor armazena o conteúdo do resultado
+      # Como podem existir outras tables na página, vou usar
+      # este seletor um pouco mais específico.
+
+      search_result = {}
+
+      table_bodies = doc.css('div.search > table > tbody')
+
+      table_bodies.each do |tbody|
+        header = tbody.css('tr > td.table-header').text
+        search_result[header] = []
+        tbody.css('tr > td > a').each do |result|
+          search_result[header] << result.text
+        end
+      end
+
+      search_result
+    end
+
+    def to_s
+      "<Spider #{self.class}>"
+    end
+
+    def inspect
+      to_s
+    end
+  end
+
   #
   # RankingSpider é uma classe de Spider que extrai dados do ranking de times
   # do site HLTV
   # Este spider irá coletar dados de todos os times do ranking em uma dada data
   # e irá armazenar os dados em um arquivo JSON
   #
-  class RankingSpider
+  class RankingSpider < SpiderBase
     ALLOWED_REGIONS = [
       'North America', 'Argentina', 'Brazil', 'Belarus',
       'Czech Republic', 'Denmark', 'Finland', 'France', 'Germany',
@@ -41,7 +101,6 @@ module HLTV
     ].freeze
 
     def parse(url = nil, **kwargs)
-
       if url.nil?
         url = if kwargs.empty?
                 "#{BASE_URL}/ranking/teams/"
@@ -97,23 +156,7 @@ module HLTV
       team_data
     end
 
-    def generate_json(filepath, url)
-      data = parse(url)
-
-      File.open(filepath, 'w') do |file|
-        file.write(data.to_json)
-      end
-    end
-
     private
-
-    def get_url(url)
-      resp = HTTParty.get(url, headers: HEADER)
-
-      raise ConnectionError, "Connection error: #{resp.code}" if resp.code != 200
-
-      resp
-    end
 
     def generate_url(**kwargs)
       raise('invalid Region') unless !kwargs[:region].nil? && !(kwargs[:region] in ALLOWED_REGIONS)
@@ -143,6 +186,9 @@ module HLTV
 
       team_data.each { |k, v| team_data[k] = nil if v == '' }
     end
+  end
+
+  class TeamSpider
   end
 
   class ConnectionError < StandardError

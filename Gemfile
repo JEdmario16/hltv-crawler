@@ -8,7 +8,7 @@ gem 'nokogiri', '~> 1.6', '>= 1.6.8'
 
 group :development do
   gem 'byebug', '~> 9.0', '>= 9.0.6'
-  gem 'pry', '~> 0.10.4'
+  gem 'pry'
   gem 'rubocop', '~> 1.0', '>= 1.0.1'
 end
 
