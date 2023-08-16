@@ -66,10 +66,21 @@ module HLTV
       table_bodies = doc.css('div.search > table > tbody')
 
       table_bodies.each do |tbody|
-        header = tbody.css('tr > td.table-header').text
+        tbody_results = tbody.css('tr')
+        header = tbody_results.css('td.table-header').first.text.downcase.to_sym
+        tbody_results.shift # Remove o header
         search_result[header] = []
-        tbody.css('tr > td > a').each do |result|
-          search_result[header] << result.text
+        tbody_results.each do |result|
+          if header == :article
+            article = {
+              title: result.css('td > a').first.text,
+              date: result.css('td.text-center > span').first.text,
+              author: result.css('td.text-center > a').text
+            }
+            search_result[header] << article
+          else
+            search_result[header] << result.css('td > a').text
+          end
         end
       end
 
